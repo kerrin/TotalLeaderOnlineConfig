@@ -1,0 +1,334 @@
+#-----------------------------------------------------------------------------
+# Config: queries.list
+#-----------------------------------------------------------------------------
+# Description:
+#              Contains the select statements used by the site
+#              Queries can contain variable replacement, all tables should
+#              be variables, as should anything that is not to be quoted
+#-----------------------------------------------------------------------------
+# CVS Details
+# -----------
+# $Author: kerrin $
+# $Date: 2004/07/04 15:33:10 $
+# $Revision: 1.25 $
+#-----------------------------------------------------------------------------
+
+# Get the member details specific to this site for the member
+[get_site_member_details]
+   SELECT   ID, member_ID, show_rows, show_columns
+   FROM     #member_details
+   WHERE    member_ID = ?
+[end]
+
+# List all the games belonging to the current user
+[my_games]
+   SELECT   G.ID, G.creator_ID, G.height, G.width, G.players, G.next_turn, 
+            G.start_date_time, G.max_turns, G.turn, G.turn_frequency_hours,
+            G.frequency_weekday_type_ID, G.turn_start_time, G.turn_stop_time,
+            G.done
+   FROM     #game AS G 
+   LEFT JOIN #game_player AS GP ON G.ID = GP.game_ID
+   WHERE    ((creator_ID = ? AND ISNULL(GP.game_ID)) OR GP.member_ID = ? ) AND
+            (G.next_turn > (NOW() - INTERVAL 14 DAY) OR G.done = 0) 
+[end]
+
+# List all the games matching the search parameters
+[find_games]
+   SELECT   ID, creator_ID, height, width, players, next_turn, done,
+            start_date_time, max_turns, turn, turn_frequency_hours,
+            frequency_weekday_type_ID, turn_start_time, turn_stop_time
+   FROM     #game
+   WHERE    #search_params
+[end]
+
+# Get the details of a game from its ID
+# Used by Common Tools Get Game Details
+[get_game_details]
+   SELECT   ID, creator_ID, height, width, players, next_turn, 
+            start_date_time, max_turns, turn, turn_frequency_hours,
+            frequency_weekday_type_ID, turn_start_time, turn_stop_time, done
+   FROM     #game
+   WHERE    ID = ?
+[end]
+
+# Get the details for a games players
+[get_game_player_details]
+   SELECT   ID AS player_ID, member_ID, colour_ID, recruits_left, money,
+            start_across, start_down
+   FROM     #game_player
+   WHERE    game_ID = ?
+[end]
+
+# Get the details for a games players
+[get_game_player_details_for_member]
+   SELECT   ID AS player_ID, member_ID, colour_ID, recruits_left, money,
+            start_across, start_down
+   FROM     #game_player
+   WHERE    game_ID = ? AND member_ID = ?
+[end]
+
+# Get the details for a games players
+[get_game_player_details_for_player_ID]
+   SELECT   member_ID, colour_ID, recruits_left, money, start_across, start_down
+   FROM     #game_player
+   WHERE    game_ID = ? AND ID = ?
+[end]
+
+# get a section of the board to display
+[get_board]
+   SELECT   S.ID, S.across, S.down, S.owner_ID, S.units, S.land_type_ID, 
+            S.expansion_type_ID, S.expansion_hp, S.expansion_to_build,
+            E.effect_type_ID, E.turns_left, E.owner_ID AS effect_owner_ID
+   FROM     #game_board AS S
+   LEFT JOIN #square_effect_details AS E ON S.ID = E.game_board_ID 
+   WHERE    S.game_ID = ? AND
+            ((S.across BETWEEN ? AND ?) #additional_across) AND
+            ((S.down BETWEEN ? AND ?) #additional_down)
+[end]
+
+# get a squares details
+[get_square_details]
+   SELECT   S.ID, S.across, S.down, S.owner_ID, S.units, S.land_type_ID, 
+            S.expansion_type_ID, S.expansion_hp, S.expansion_to_build
+   FROM     #game_board AS S
+   WHERE    S.game_ID = ? AND S.across = ? AND S.down = ?
+[end]
+
+# get a squares effects
+[get_square_effects]
+   SELECT   E.ID, E.effect_type_ID, E.turns_left, E.owner_ID as effect_owner_ID,
+            B.owner_ID, B.units, B.land_type_ID, 
+            B.expansion_type_ID, B.expansion_hp, B.expansion_to_build
+   FROM     #square_effect_details AS E, #game_board AS B
+   WHERE    B.game_ID = ? AND B.across = ? AND B.down = ? AND 
+            B.ID = E.game_board_ID
+[end]
+
+# get a squares effects
+[get_all_square_effects]
+   SELECT   E.ID, E.turns_left, E.owner_ID as effect_owner_ID,
+            B.owner_ID, B.units, B.land_type_ID, B.across, B.down,
+            B.expansion_type_ID, B.expansion_hp, B.expansion_to_build
+   FROM     #square_effect_details AS E, #game_board AS B
+   WHERE    B.game_ID = ? AND E.effect_type_ID = ? AND B.ID = E.game_board_ID
+[end]
+
+# get a squares effects
+[get_player_effect_count]
+   SELECT   count(B.ID) as square_number, sum(B.units) as unit_number
+   FROM     #square_effect_details AS E, #game_board AS B
+   WHERE    B.game_ID = ? AND B.owner_ID = ? AND E.effect_type_ID = ? AND 
+            B.ID = E.game_board_ID
+   GROUP BY E.effect_type_ID
+[end]
+
+# get a processing squares details
+[get_processing_board_details]
+   SELECT   ID, across, down, units
+   FROM     #processing_board AS S
+   WHERE    across = ? AND down = ?
+[end]
+
+# get_other_players_pending_start_locations
+[get_other_players_pending_start_locations]
+   SELECT   across, down, game_player_ID
+   FROM     #pending_game_player_start AS S
+   WHERE    S.game_ID = ? AND game_player_ID != ?
+[end]
+
+# Get the list of land types
+[get_land_details]
+   SELECT   L.ID, L.name, L.description, L.image
+   FROM     #land_type_const AS L
+[end]
+
+# Get the list of expansion types
+[get_expansion_details]
+   SELECT   ID, name, description, image, require_tech_ID, require_land_ID,
+            money_cost, unit_cost, turns
+   FROM     #expansion_type_const
+[end]
+
+# Get the list of expansion types
+[get_expansion_details_from_ID]
+   SELECT   ID, name, description, image, require_tech_ID, require_land_ID,
+            money_cost, unit_cost, turns
+   FROM     #expansion_type_const
+   WHERE    ID = ?
+[end]
+
+# Get the list of effect types
+[get_effect_details]
+   SELECT   E.ID, E.name, E.description, E.image, E.money_cost
+   FROM     #effect_type_const AS E
+[end]
+
+# Get the square owners details
+[get_owner_details]
+   SELECT   P.ID, P.member_ID, P.recruits_left, P.money, C.name, C.image,
+            P.start_across, P.start_down
+   FROM     #game_player AS P, #player_colour AS C
+   WHERE    P.game_ID = ? AND P.colour_ID = C.ID
+[end]
+
+# Get the details of a technology from the ID
+[get_technology_details]
+   SELECT   ID,name,description,tech_points,require_ID,image
+   FROM     #technology_type_const
+   WHERE    ID = ?
+[end]
+
+# Get the details of a technology from the ID
+[check_player_technology]
+   SELECT   ID
+   FROM     #game_player_technology_link
+   WHERE    technology_ID = ? AND game_player_ID = ? AND tech_points = 0
+[end]
+
+# Get the details of a technology from the ID
+[check_player_researching_technology]
+   SELECT   ID
+   FROM     #game_player_technology_link
+   WHERE    technology_ID = ? AND game_player_ID = ? AND tech_points > 0
+[end]
+
+# Get the details of a technology from the ID
+[find_player_researching_technology]
+   SELECT   ID, tech_points
+   FROM     #game_player_technology_link
+   WHERE    game_player_ID = ? AND tech_points > 0
+[end]
+
+# Get the games that need to be started now
+[get_games_pending_starting_now]
+   SELECT   ID, players
+   FROM     #game
+   WHERE    done = 0 AND turn = 0 AND start_date_time <= ?
+[end]
+
+# Get the number of Players assigned to the game
+[get_number_of_players_in_game]
+   SELECT   count(ID) as number
+   FROM     #pending_game_player_start
+   WHERE    game_ID = ?
+[end]
+
+# Get the pending games that are waiting to start now
+[get_game_pending_start_details]
+   SELECT   ID, game_player_ID, across, down
+   FROM     #pending_game_player_start
+   WHERE    game_ID = ?
+[end]
+
+# Get the turns that are currently pending
+[get_games_pending_turns_now]
+   SELECT   ID, height, width, players, max_turns, turn, turn_frequency_hours,
+            turn_start_time, turn_stop_time
+   FROM     #game
+   WHERE    done = 0 AND next_turn < ? AND turn > 0
+[end]
+
+# Get all the game moves
+[get_game_moves]
+   SELECT   ID, from_across, from_down, to_across, to_down, units, 
+            move_type_ID, owner_ID
+   FROM     #game_board_move
+   WHERE    game_ID = ?
+   ORDER BY move_type_ID, RAND()
+[end]
+
+# Get a squares moves
+[get_game_square_move]
+   SELECT   ID, units
+   FROM     #game_board_move
+   WHERE    game_ID = ? AND from_across = ? AND from_down = ? AND
+            to_across = ? AND to_down = ? AND move_type_ID = ? AND 
+            owner_ID = ?
+[end]
+
+# Get a squares moves
+[get_game_square_building_moves]
+   SELECT   ID, units
+   FROM     #game_board_move
+   WHERE    game_ID = ? AND from_across = ? AND from_down = ? AND
+            to_across = ? AND to_down = ? AND move_type_ID IN (#buildings)
+[end]
+
+# Get a squares moves
+[get_game_square_moves]
+   SELECT   ID, from_across, from_down, to_across, to_down, units, 
+            move_type_ID, owner_ID
+   FROM     #game_board_move
+   WHERE    game_ID = ? AND 
+            ((from_across = ? AND from_down = ?) OR
+             (to_across = ? AND to_down = ?))
+[end]
+
+# Get a squares moves for a player
+[get_game_square_moves_for_player]
+   SELECT   ID, from_across, from_down, to_across, to_down, units, 
+            move_type_ID, owner_ID
+   FROM     #game_board_move
+   WHERE    game_ID = ? AND owner_ID = ? AND 
+            ((from_across = ? AND from_down = ?) OR
+             (to_across = ? AND to_down = ?))
+[end]
+
+# Get a squares moves for a player
+[get_move_details]
+   SELECT   ID, name, description,require_tech_ID,require_land_ID
+   FROM     #move_type_const
+[end]
+
+# Get a squares moves for a player
+[get_game_player_quick_lookup_details]
+   SELECT   ID, squares, science_per_turn, units 
+   FROM     #game_player_quick_lookup
+   WHERE    game_ID = ? AND game_player_ID = ?
+[end]
+
+# Get the details of the current processing of game turns
+[get_processing_details]
+   SELECT   ID,game_ID,stage
+   FROM     #processing_details
+[end]
+
+# Check there are no units left un processed
+[check_processing_board_for_units]
+   SELECT   down, across, units
+   FROM     #processing_board
+   WHERE    units > 0
+[end]
+
+# Get the player counts to update the quick lookup table
+[get_game_player_counts]
+   SELECT   count(ID) AS total_squares, sum(units) AS total_units
+   FROM     #game_board
+   WHERE    owner_ID = ? AND game_ID = ?
+[end]
+
+# Get the number of expansions a player has
+[get_game_player_expansion_counts]
+   SELECT   count(ID) AS number, expansion_type_ID
+   FROM     #game_board
+   WHERE    owner_ID = ? AND game_ID = ? AND expansion_to_build = 0
+   GROUP BY expansion_type_ID
+[end]
+
+# Get the number of expansions a player has
+[get_game_player_single_expansion_count]
+   SELECT   count(ID) AS number, expansion_type_ID
+   FROM     #game_board
+   WHERE    owner_ID = ? AND game_ID = ? AND expansion_type_ID = ? AND 
+            expansion_to_build = 0
+   GROUP BY expansion_type_ID
+[end]
+
+# Get the number of units on an expansion type a player has
+[calculate_game_player_points]
+   SELECT   sum(units * ?) AS points
+   FROM     #game_board
+   WHERE    owner_ID = ? AND game_ID = ? AND expansion_type_ID = ? AND 
+            expansion_to_build = 0
+[end]
+
